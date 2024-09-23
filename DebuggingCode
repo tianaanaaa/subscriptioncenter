@@ -1,0 +1,370 @@
+// code throwing 500 error 
+
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+
+ <style>
+    body {
+            color: #4F4F4F;
+            font-family: "Salesforce Sans", Montserrat, Helvetica, Arial, sans-serif !important;
+            font-size: 14px;
+            max-width: 100%;
+            line-height: 1.5;
+            padding: 20px;
+            margin: 0px auto;
+            max-width: 100%;
+            background-color: #FFF;
+            padding: 0px;
+        }
+    form {
+      width: 100%;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      box-sizing: border-box;
+    }
+    h2 {
+      color: #333;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    h3 {
+      color: #555;
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #555;
+    }
+    input[type="email"], input[type="text"], input[type="checkbox"] {
+      margin-bottom: 15px;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+    }
+    input[type="checkbox"] {
+      width: auto;
+      margin-right: 10px;
+    }
+    input[type="submit"] {
+      background-color: #263466;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    input[type="submit"]:hover {
+      background-color: #263466;
+    }
+    p {
+      margin: 10px 0;
+    }
+       footer,
+        .footer {
+            background: var(--footer-color);
+            color: var(--footer-text-color) !important;
+            line-height: 2em;
+            text-align: center;
+        }
+  </style>
+  
+  <title>Custom Profile/Subscription Center</title>
+  
+     %%[ 
+    SET @subscriberKey = 'tiana.murphy@otrcapital.com'
+    ]%%
+
+%%=v(@subscriberKey)=%%
+    
+  <script runat="server" language="JavaScript">
+    Platform.Load("core","1.1.2");
+
+ 
+    //////////////////////////////
+    // CUSTOMIZATION SECTION START
+    //////////////////////////////
+
+    // Needed Profile Attributes (Profile Management)
+    var profileInfo_needed = ["First Name", "Last Name"];
+
+    // Needed Lists (Publication Lists)
+    var publicationsList_needed = ["Client Account & Product Notifications", "Account Setup", "Marketing Emails"];
+
+    //////////////////////////////
+    // CUSTOMIZATION SECTION END
+    //////////////////////////////
+
+    try {
+      var subscriberKey = Variable.GetValue("@subscriberKey");
+
+      var attributes_needed = profileInfo_needed;
+      var lists_needed = publicationsList_needed;
+
+      var init_subscriber = Subscriber.Init(subscriberKey);
+      var init_subscriberAttributes = init_subscriber.Attributes.Retrieve();
+      var init_subscriberList = init_subscriber.List.Retrieve();
+      var init_list = List.Retrieve();
+      
+      var profileInfo_keys = createKeys(profileInfo_needed, "profileInfo");
+      var lists_keys = createKeys(lists_needed, "list");
+      var profileInfo_values = [];
+      var lists_values = [];
+      var lists_ID = [];
+      
+      
+      // Get Subscriber Details
+      var subscriberDetails = Subscriber.Retrieve({
+        Property: "SubscriberKey",
+        SimpleOperator: "equals",
+        Value: subscriberKey
+      });
+      
+      
+
+      // Create Subscriber Object
+      var subscriberObject = {
+        "Subscriber Key" : subscriberKey,
+        "Email Address" : subscriberDetails[0].EmailAddress,
+        "Status" : (subscriberDetails[0].Status == "Active")
+      };
+       
+      // Generate Subscriber Object
+      for(s=0; s<init_subscriberAttributes.length; s++) {
+        for(n=0; n<attributes_needed.length; n++) {
+          if(attributes_needed[n].indexOf(init_subscriberAttributes[s].Name) > -1) {
+            subscriberObject[init_subscriberAttributes[s].Name] = init_subscriberAttributes[s].Value;
+            break;
+          }
+        }
+      }
+
+     for(n=0; n<profileInfo_needed.length; n++) {
+        profileInfo_values.push(subscriberObject[profileInfo_needed[n]]);
+      }
+    
+      /* 
+        Match the Subscription details with the Pre-Subscribed publication lists
+        Note: When the subscriber is not subscribed to a publication list earlier, 
+        it would end up with failure – Key wouldn't be found in the init_subscriberList, 
+        so isFound is used to manage empty initialization      
+      */
+
+
+   for(n=0; n<lists_needed.length; n++) {
+        var isFound = false;
+   }
+
+        // Get Subscriber current Subscription Status
+        for(i=0; i<init_subscriberList.length; i++) {
+          if(init_subscriberList[i].List.Name == lists_needed[n]) {
+            if(init_subscriberList[i].Status == "Active" && !init_subscriberList[i].hasOwnProperty('UnsubscribedDate')) {
+              lists_values.push("Checked");  
+              isFound = true;
+            }  
+            break;
+          } 
+        }
+
+        if(!isFound) {
+          lists_values.push('');
+        }
+
+        // Get Publication List's ID
+        for(j=0; j<init_list.length; j++) {
+          if(init_list[j].ListName == lists_needed[n]) {
+            lists_ID.push(init_list[j].ID);
+            break;
+          }
+        }
+      } 
+
+      if(subscriberDetails[0].Status == "Active") {
+        Variable.SetValue("subscriptionStatus", true);
+      } else {
+        Variable.SetValue("subscriptionStatus", false);
+      }
+    
+      // Form Submit Validation
+      var isFormSubmitted = Platform.Request.GetFormField('isFormSubmitted') || false;
+
+      // Unsubsubcribe from all
+      var unsubscribe = Platform.Request.GetFormField('unsubscribe') ? true : false;
+      
+      if(isFormSubmitted) {
+        var emailAddress = Platform.Request.GetFormField('emailAddress') || "";
+        var listsObj = [];
+
+        var subscriberData = {
+          "Attributes": {},
+          "EmailAddress": emailAddress
+        };
+        
+          // Build Attributes to save
+        for(n=0; n<profileInfo_needed.length; n++) {
+          subscriberData.Attributes[profileInfo_needed[n]] = Platform.Request.GetFormField(profileInfo_keys[n] + "-profileInfo") || "";
+        }
+        
+        
+        for(n=0; n<lists_needed.length; n++) {
+          listsObj.push({
+            ID: lists_ID[n],
+            Status: Platform.Request.GetFormField(lists_keys[n] + "") ? 'Active' : 'Unsubscribed'
+          });
+        }
+
+        /* SUBSCRIPTION HANDLER
+        * Unsubscribes only if the user unsubscribes from the form
+        * If the user is already unsubscribed, this will be ignored
+        */
+        var status_unsubscribe = "NA";
+        var status_resubscribe = "NA";
+        if(subscriberObject.Status == unsubscribe) { 
+          if(unsubscribe) {
+            status_unsubscribe = init_subscriber.Unsubscribe();
+          } else {
+            status_resubscribe = init_subscriber.Update({"Status" : "Active"});
+          }
+        }
+        Variable.SetValue("status_unsubscribe", status_unsubscribe);
+        Variable.SetValue("status_resubscribe", status_resubscribe);
+
+        // Update the subscriber attributes
+        var status_subscriberAttribs = init_subscriber.Update(subscriberData);
+        Variable.SetValue("status_subscriberAttribs", status_subscriberAttribs);
+
+        // Update the lists
+        var prox = new Script.Util.WSProxy();
+        var updateLists = {
+          SubscriberKey: subscriberKey,
+          EmailAddress: emailAddress,
+          Lists: listObj
+        };
+        var options = { 
+            SaveOptions: [{
+              PropertyName: "*",
+              SaveAction: "UpdateAdd"
+            }]
+        };
+    
+        var status_publicationList = prox.createItem("Subscriber", updateLists, options);
+        Variable.SetValue("status_publicationList", status_publicationList.Status);
+
+        Variable.SetValue("formSubmitted", true);
+      } else {
+        Variable.SetValue("formSubmitted", false);
+      }
+
+
+      // AMPSCRIPT VARIABLES FOR HTML    
+      // Profile Information
+      Variable.SetValue("profileInfo_needed", profileInfo_needed);
+      Variable.SetValue("profileInfo_keys", profileInfo_keys);
+      Variable.SetValue("profileInfo_values", profileInfo_values);
+
+      // Lists
+      Variable.SetValue("lists_needed", lists_needed);
+      Variable.SetValue("lists_keys", lists_keys);
+      Variable.SetValue("lists_values", lists_values);
+      
+      Variable.SetValue("emailAddress", subscriberObject['Email Address']);
+      Variable.SetValue("subscriberStatus", subscriberObject['Status'] ? '' : 'Checked');
+      Variable.SetValue("isReadOnly", subscriberObject.Status ? '' : 'readonly ');
+
+      // Helper Functions
+      function createKeys(valueArr, suffix) {
+        var returnVar = [];
+        for(k=0;k<valueArr.length; k++) {
+          returnVar.push(valueArr[k].split(" ").join("") + (suffix ? "-" + suffix : ""));
+        }
+        return returnVar;
+      }
+    } catch(ex) {
+      Write(Stringify(ex));
+    }
+  </script>
+
+ <form method="POST">
+   
+  <h2>PROFILE CENTER</h2>
+   
+  <h3>My Personal Information</h3>
+  
+<!-- Email Address -->
+  <label for="emailAddress">Email Address *: </label>
+  <input type="email" placeholder="" required="" name="emailAddress" id="emailAddress" value="%%=v(@emailAddress)=%%"><br>
+  <!-- First Name -->
+  <label for="FirstName">First Name: </label>
+  <input type="text" name="FirstName" id="FirstName" minlength="0" maxlength="25" value="%%=v(@FirstName)=%% "><br>
+  
+  <!-- Last Name -->
+  <label for="LastName">Last Name: </label>
+  <input type="text" name="LastName" id="LastName" minlength="0" maxlength="25" value="%%=v(@LastName)=%% "><br>
+  
+  <!-- The rest of your form... -->
+  
+  <input type="hidden" name="isFormSubmitted" value="true">
+  <input type="checkbox" value="Update">
+    
+<h2>SUBSCRIPTION CENTER</h2>
+    <h3>Available Publications</h3>
+    %%[FOR @i = 1 TO RowCount(@lists_needed) DO]%%
+    <input type="checkbox" name="%%=v(Row(@lists_keys, @i))=%%" id="%%=v(Row(@lists_keys, @i))=%%" value="true" %%=v(Row(@lists_values, @i))=%% %%=v(@isReadOnly)=%%>
+    <label for="%%=v(Row(@lists_keys, @i))=%%">%%=v(Row(@lists_needed, @i))=%%</label><br>
+    %%[NEXT @i]%%
+   
+   
+    <h2>UNSUBSCRIBE FROM ALL</h2>
+    <p>If you wish to unsubscribe from ALL publications, check the box and click the update button below.</p>
+    <input id="unsubscribe" type="checkbox" name="unsubscribe" value="true" %%=v(@subscriberStatus)=%%>
+    <label for="unsubscribe">I no longer wish to receive any future communications.</label> 
+    <br><br>
+   
+    <input type="hidden" name="isFormSubmitted" value="true">
+    <input type="submit" value="Update">
+   
+</form>
+
+ !– Scripts –&gt;
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@10.3.5/dist/sweetalert2.all.min.js"></script>
+
+%%[ IF @formSubmitted AND @status_subscriberAttribs == "OK" AND @status_publicationList == "OK" AND @status_unsubscribe == "NA" AND @status_resubscribe == "NA" THEN ]%%
+<script>
+  Swal.fire("Updated!", "Your preferences are updated successfully", "success").then(() => {
+    location.href = location.href;
+  });
+</script>
+%%[ ELSEIF @formSubmitted AND (@status_subscriberAttribs != "OK" OR @status_publicationList != "OK") AND @status_unsubscribe == "NA" AND @status_resubscribe == "NA" THEN ]%%
+<script>
+  Swal.fire("Not Updated!", "Something went wrong while updating your preferences", "error").then(() => {
+    location.href = location.href;
+  });
+</script>
+%%[ ELSEIF @formSubmitted AND @status_unsubscribe == "OK" AND @status_resubscribe == "NA" THEN ]%%
+<script>
+  Swal.fire("Unsubscribed!", "Sorry to see you go away!", "info").then(() => {
+    location.href = location.href;
+  });
+</script>
+%%[ ELSEIF @formSubmitted AND @status_unsubscribe == "NA" AND @status_resubscribe == "OK" THEN ]%%
+<script>
+  Swal.fire("Subscribed!", "Happy to see you again!", "success").then(() => {
+    location.href = location.href;
+  });
+</script>
+
+%%[ ELSE ]%%
+
+%%[ ENDIF ]%%
