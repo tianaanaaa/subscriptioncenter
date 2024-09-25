@@ -98,7 +98,7 @@
     var mylists_needed = ["HTML Email"];
 
    // Needed Lists (Publication Lists)
-    var publicationsList_needed = ["Client Account & Product Notifications", "Account Setup", "Marketing Emails"];
+    var publicationsList_needed = ["Client Account and Product Notifications", "Account Setup", "Marketing Emails"];
 
     //////////////////////////////
     // CUSTOMIZATION SECTION END
@@ -223,7 +223,13 @@
             Status: Platform.Request.GetFormField(lists_keys[n] + "") ? 'Active' : 'Unsubscribed'
           });
         }
-
+        
+        Write("debug: listsObj = " + Stringify(listsObj) +"<br>");
+        Write("debug: subscriberData.Attributes = " + Stringify(subscriberData.Attributes) +"<br>");
+        Write("debug: profileInfo_needed = " + Stringify(profileInfo_needed) +"<br>");
+        Write("debug: preferences_needed = " + Stringify(preferences_needed) +"<br>");
+        Write("debug: options = " + Stringify(options) +"<br>");
+        
         /* SUBSCRIPTION HANDLER
         * Unsubscribes only if the user unsubscribes from the form
         * If the user is already, unsubscribed, this will be ignored
@@ -243,7 +249,10 @@
         // Update the subscriber attributes
         var status_subscriberAttribs = init_subscriber.Update(subscriberData);
         Variable.SetValue("status_subscriberAttribs", status_subscriberAttribs);
-
+        
+         Write("debug: status_subscriberAttribs = " + Stringify(status_subscriberAttribs) +"<br>");
+         Write("debug: updateLists = " + Stringify(updateLists) +"<br>");
+        
         // Update the lists
         var prox = new Script.Util.WSProxy();
         var updateLists = {
@@ -257,14 +266,15 @@
               SaveAction: "UpdateAdd"
             }]
         };
-
+       
         var status_publicationList = prox.createItem("Subscriber", updateLists, options);
         Variable.SetValue("status_publicationList", status_publicationList.Status);
-
         Variable.SetValue("formSubmitted", true);
       } else {
         Variable.SetValue("formSubmitted", false);
       }
+     
+         Write("debug: status_publicationList = " + Stringify(status_publicationList) +"<br>");
 
       // AMPSCRIPT VARIABLES FOR HTML    
       // Profile Information
@@ -297,7 +307,6 @@
     } catch(ex) {
       Write(Stringify(ex));
     }
-    
   </script>
 
   <form method="POST">
