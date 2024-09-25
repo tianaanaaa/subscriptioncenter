@@ -1,10 +1,8 @@
-
-
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+ <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
  <style>
     body {
             color: #4F4F4F;
@@ -78,50 +76,51 @@
             text-align: center;
         }
   </style>
-  
-  <title>Custom Profile/Subscription Center</title>
-  
-    
-     %%[ 
-    SET @subscriberKey = 'tiana.murphy@otrcapital.com'
-    ]%%
 
-%%=v(@subscriberkey)=%%
-    
+ %%[ SET @subscriberKey = 'tiana.murphy@otrcapital.com'
+  ]%%
+  %%=v(@subscriberkey)=%%
+
   <script runat="server" language="JavaScript">
     Platform.Load("core","1.1.2");
 
- 
     //////////////////////////////
     // CUSTOMIZATION SECTION START
     //////////////////////////////
 
     // Needed Profile Attributes (Profile Management)
-    var profileInfo_needed = ["First Name", "Last Name", "Email Address"];
+    var profileInfo_needed = ["First Name", "Last Name"];
 
-    // Needed Lists (Publication Lists)
-    var publicationsList_needed = ["Client Account and Product Notifications", "Account Setup", "Marketing Emails"];
+    // Needed Preferences (Preference Management)
+    var preferences_needed = ["HTML Email"];
+
+    // Needed Lists (My Lists)
+    var mylists_needed = ["HTML Email"];
+
+   // Needed Lists (Publication Lists)
+    var publicationsList_needed = ["Client Account & Product Notifications", "Account Setup", "Marketing Emails"];
 
     //////////////////////////////
     // CUSTOMIZATION SECTION END
     //////////////////////////////
-
     try {
       var subscriberKey = Variable.GetValue("@subscriberKey");
 
-      var attributes_needed = profileInfo_needed;
-      var lists_needed = publicationsList_needed;
+      var attributes_needed = profileInfo_needed.concat(preferences_needed);
+      var lists_needed      = mylists_needed.concat(publicationsList_needed);
 
       var init_subscriber = Subscriber.Init(subscriberKey);
       var init_subscriberAttributes = init_subscriber.Attributes.Retrieve();
       var init_subscriberList = init_subscriber.Lists.Retrieve();
-      var init_list = List.Retrieve();
+      var init_list = List.Retrieve({Property: "ListName", SimpleOperator: "IN", Value: lists_needed});
       
-      var profileInfo_keys = createKeys(profileInfo_needed, "profileInfo");
-      var lists_keys = createKeys(lists_needed, "list");
+      var profileInfo_keys   = createKeys(profileInfo_needed, "profileInfo");
+      var preferences_keys   = createKeys(preferences_needed, "preference");
+      var lists_keys         = createKeys(lists_needed, "list");
       var profileInfo_values = [];
-      var lists_values = [];
-      var lists_ID = [];
+      var preferences_values = [];
+      var lists_values       = [];
+      var lists_ID           = [];
       
       // Get Subscriber Details
       var subscriberDetails = Subscriber.Retrieve({
@@ -136,7 +135,7 @@
         "Email Address" : subscriberDetails[0].EmailAddress,
         "Status" : (subscriberDetails[0].Status == "Active")
       };
-       
+
       // Generate Subscriber Object
       for(s=0; s<init_subscriberAttributes.length; s++) {
         for(n=0; n<attributes_needed.length; n++) {
@@ -147,15 +146,19 @@
         }
       }
 
-     for(n=0; n<profileInfo_needed.length; n++) {
+      for(n=0; n<profileInfo_needed.length; n++) {
         profileInfo_values.push(subscriberObject[profileInfo_needed[n]]);
       }
-    
+      for(n=0; n<preferences_needed.length; n++) {
+        preferences_values.push(subscriberObject[preferences_needed[n]] == "True" ? "Checked" : "");
+      }
+
       /* 
         Match the Subscription details with the Pre-Subscribed publication lists
-        Note: When the subscriber is not subscribed to a publication list earlier, 
-        it would end up with failure – Key wouldn't be found in the init_subscriberList, 
-        so isFound is used to manage empty initialization      
+
+        Note: When the subscriber is not subscribed to a publication list earlier, then it would end up 
+        with failure - Key wouldn't be found in the init_subscriberList, so isFound is used to manage 
+        empty initialization      
       */
 
       for(n=0; n<lists_needed.length; n++) {
@@ -205,42 +208,25 @@
           "Attributes": {},
           "EmailAddress": emailAddress
         };
-        
-          // Build Attributes to save
-        for(n=0; n<profileInfo_needed.length; n++) {
-          subscriberData.Attributes[profileInfo_needed[n]] = Platform.Request.GetFormField(profileInfo_keys[n] + "-profileInfo") || "";
-        }
-        
-        
-        // Set default values if attributes are undefined
-     var defaultProfileValues = {
-    "First Name": " ",
-    "Last Name": " ",
-    "EmailAddress": " "
-};
-
-// Build Subscriber Object
-for (s = 0; s < init_subscriberAttributes.length; s++) {
-    for (n = 0; n < attributes_needed.length; n++) {
-        if (attributes_needed[n].indexOf(init_subscriberAttributes[s].Name) > -1) {
-            subscriberObject[init_subscriberAttributes[s].Name] = init_subscriberAttributes[s].Value || defaultProfileValues[init_subscriberAttributes[s].Name];
-            break;
-        }
-    }
-}
-
-for (n = 0; n < profileInfo_needed.length; n++) {
-    profileInfo_values.push(subscriberObject[profileInfo_needed[n]] || defaultProfileValues[profileInfo_needed[n]]);
-}
 
         // Build Attributes to save
         for(n=0; n<profileInfo_needed.length; n++) {
           subscriberData.Attributes[profileInfo_needed[n]] = Platform.Request.GetFormField(profileInfo_keys[n] + "-profileInfo") || "";
         }
-        /* s
+        for(n=0; n<preferences_needed.length; n++) {
+          subscriberData.Attributes[preferences_needed[n]] = Platform.Request.GetFormField(preferences_keys[n] + "-preference") ? true : false;
+        }
+
+        for(n=0; n<lists_needed.length; n++) {
+          listsObj.push({
+            ID: lists_ID[n],
+            Status: Platform.Request.GetFormField(lists_keys[n] + "") ? 'Active' : 'Unsubscribed'
+          });
+        }
+
         /* SUBSCRIPTION HANDLER
         * Unsubscribes only if the user unsubscribes from the form
-        * If the user is already unsubscribed, this will be ignored
+        * If the user is already, unsubscribed, this will be ignored
         */
         var status_unsubscribe = "NA";
         var status_resubscribe = "NA";
@@ -271,21 +257,9 @@ for (n = 0; n < profileInfo_needed.length; n++) {
               SaveAction: "UpdateAdd"
             }]
         };
-        
-    var resp = prox.createItem("Subscriber", sub, options);
-    
-    Write("Response: " + Stringify(resp));
-        //updates subscribers status for each lists
 
         var status_publicationList = prox.createItem("Subscriber", updateLists, options);
         Variable.SetValue("status_publicationList", status_publicationList.Status);
-        
-        // Set the updateStatus based on the success of these operations
-      if(status_subscriberAttribs == "OK" && status_publicationList.Status == "OK") {
-      Variable.SetValue("updateStatus", "OK");
-  } else {
-      Variable.SetValue("updateStatus", "Error");
-}
 
         Variable.SetValue("formSubmitted", true);
       } else {
@@ -297,6 +271,11 @@ for (n = 0; n < profileInfo_needed.length; n++) {
       Variable.SetValue("profileInfo_needed", profileInfo_needed);
       Variable.SetValue("profileInfo_keys", profileInfo_keys);
       Variable.SetValue("profileInfo_values", profileInfo_values);
+
+      // Preferences
+      Variable.SetValue("preferences_needed", preferences_needed);
+      Variable.SetValue("preferences_keys", preferences_keys);
+      Variable.SetValue("preferences_values", preferences_values);
 
       // Lists
       Variable.SetValue("lists_needed", lists_needed);
@@ -318,52 +297,53 @@ for (n = 0; n < profileInfo_needed.length; n++) {
     } catch(ex) {
       Write(Stringify(ex));
     }
+    
   </script>
 
   <form method="POST">
-  <h2>PROFILE CENTER</h2>
-  <h3>My Personal Information</h3>
   
-<!-- Email Address -->
-  <label for="emailAddress">Email Address *: </label>
-  <input type="email" placeholder="" required="" name="emailAddress" id="emailAddress" value="%%=v(@emailAddress)=%%"><br>
+    <h2>PROFILE CENTER</h2>
+    
+    <h3>My Personal Information</h3>
 
-  <!-- First Name -->
-  <label for="FirstName-profileInfo">First Name: </label>
-  <input type="text" name="FirstName-profileInfo" id="FirstName-profileInfo" minlength="0" maxlength="25" value=" "><br>
-  
-  <!-- Last Name -->
-  <label for="LastName-profileInfo">Last Name: </label>
-  <input type="text" name="LastName-profileInfo" id="LastName-profileInfo" minlength="0" maxlength="25" value=" "><br>
-  
-  <!-- The rest of your form... -->
-  
-  <input type="hidden" name="isFormSubmitted" value="true">
-  <input type="submit" value="Update">
+    <label for="emailAddress">Email Address *: </label>
+    <input type="email" placeholder="" required="" name="emailAddress" id="emailAddress" value="%%=v(@emailAddress)=%%" %%=v(@isReadOnly)=%%><br>
 
-    <h3>My Preferences</h3>
-      %%[FOR @i = 1 TO RowCount(@preferences_needed) DO]%%
-      <input type="checkbox" name="%%=v(Row(@preferences_keys, @i))=%%" id="%%=v(Row(@preferences_keys, @i))=%%" value="true" %%=v(Row(@preferences_values, @i))=%% %%=v(@isReadOnly)=%%>
-      <label for="%%=v(Row(@preferences_keys, @i))=%%">%%=v(Row(@preferences_needed, @i))=%%</label>
+    %%[FOR @i = 1 TO RowCount(@profileInfo_needed) DO]%%
+      <label for="%%=v(Row(@profileInfo_keys, @i))=%%">%%=v(Row(@profileInfo_needed, @i))=%%: </label>
+      <input type="text" name="%%=v(Row(@profileInfo_keys, @i))=%%" id="%%=v(Row(@profileInfo_keys, @i))=%%" minlength="0" maxlength="25" value="%%=v(Row(@profileInfo_values, @i))=%%" %%=v(@isReadOnly)=%%><br>
     %%[NEXT @i]%%
+
+    <!-- <h3>My Preferences</h3>
+    
+    %%[FOR @i = 1 TO RowCount(@preferences_needed) DO]%%
+      <input type="checkbox" name="%%=v(Row(@preferences_keys, @i))=%%" id="%%=v(Row(@preferences_keys, @i))=%%" value="true" %%=v(Row(@preferences_values, @i))=%% %%=v(@isReadOnly)=%%>
+      <label for="%%=v(Row(@preferences_keys, @i))=%%">%%=v(Row(@preferences_needed, @i))=%%</label><br>
+    %%[NEXT @i]%% -->
+
 
     <h2>SUBSCRIPTION CENTER</h2>
     <h3>Available Publications</h3>
     %%[FOR @i = 1 TO RowCount(@lists_needed) DO]%%
-      <input type="checkbox" name="%%=v(Row(@lists_keys, @i))=%%" id="%%=v(Row(@lists_keys, @i))=%%" value="true" %%=v(Row(@lists_values, @i))=%% %%=v(@isReadOnly)=%%>
-      <label for="%%=v(Row(@lists_keys, @i))=%%">%%=v(Row(@lists_needed, @i))=%%</label>
+    <input type="checkbox" name="%%=v(Row(@lists_keys, @i))=%%" id="%%=v(Row(@lists_keys, @i))=%%" value="true" %%=v(Row(@lists_values, @i))=%% %%=v(@isReadOnly)=%%>
+    <label for="%%=v(Row(@lists_keys, @i))=%%">%%=v(Row(@lists_needed, @i))=%%</label><br>
     %%[NEXT @i]%%
 
+
     <h2>UNSUBSCRIBE FROM ALL</h2>
-    <p>If you wish to unsubscribe from ALL publications, check the box and click the update button below.</p>
+    <p>If you wish to unsubscribe from ALL publications, check the box and click the update button below.</p><p>
     <input id="unsubscribe" type="checkbox" name="unsubscribe" value="true" %%=v(@subscriberStatus)=%%>
-    <label for="unsubscribe">I no longer wish to receive any future communications.</label> 
+    <label for="unsubscribe">I no longer wish to receive any future publications.</label> 
+    
     <br><br>
+
     <input type="hidden" name="isFormSubmitted" value="true">
     <input type="submit" value="Update">
-</form>
-  
 
+  </p></form>
+
+
+<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10.3.5/dist/sweetalert2.all.min.js"></script>
 
 %%[ IF @formSubmitted AND @status_subscriberAttribs == "OK" AND @status_publicationList == "OK" AND @status_unsubscribe == "NA" AND @status_resubscribe == "NA" THEN ]%%
@@ -392,5 +372,3 @@ for (n = 0; n < profileInfo_needed.length; n++) {
 </script>
 %%[ ELSE ]%%
 %%[ ENDIF ]%%
-  
-
